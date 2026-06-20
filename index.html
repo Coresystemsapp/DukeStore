@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Duke Store — Gestão</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' rx='10' fill='%230d0f11'/><path d='M4 42L10 10C10 10 16 8 18 13L24 26L30 13C32 8 38 10 38 10L44 42L34 39L31 24L25 35C24.3 36.5 23.7 36.5 23 35L17 24L14 39L4 42Z' fill='%2316e0cf'/></svg>" type="image/svg+xml">
+<link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'><rect width='48' height='48' rx='10' fill='%230d0f11'/><path d='M4 42L10 10C10 10 16 8 18 13L24 26L30 13C32 8 38 10 38 10L44 42L34 39L31 24L25 35C24.3 36.5 23.7 36.5 23 35L17 24L14 39L4 42Z' fill='%2316e0cf'/></svg>">
+<meta name="theme-color" content="#0d0f11">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -45,16 +48,17 @@ body{background:radial-gradient(ellipse 80% 50% at 50% -10%,rgba(22,224,207,.06)
 
 /* ===== APP SHELL ===== */
 .app{display:none;min-height:100vh}
-.topbar{background:rgba(13,15,17,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 22px;display:flex;align-items:center;gap:18px;height:64px;position:sticky;top:0;z-index:90}
+.topbar{background:rgba(13,15,17,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border);padding:0 16px;display:flex;align-items:center;gap:10px;height:60px;position:sticky;top:0;z-index:90;min-width:0;overflow:hidden}
 .tb-logo{display:flex;align-items:center;gap:11px}
 .tb-logo .duke{font-family:'Sora';font-size:21px;font-weight:800;color:var(--teal);letter-spacing:1px;line-height:1}
 .tb-logo .store{font-size:8px;font-weight:700;color:var(--muted);letter-spacing:5px;margin-top:1px}
-.nav{display:flex;gap:3px;margin-left:14px;flex-wrap:wrap}
-.nav-btn{background:none;border:none;color:var(--muted);font-size:13px;font-weight:500;padding:8px 14px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:7px;white-space:nowrap;transition:all .15s;font-family:inherit}
-.nav-btn .ic{font-size:16px;line-height:1}
+.nav{display:flex;gap:2px;margin-left:10px;overflow-x:auto;flex-shrink:1;min-width:0;scrollbar-width:none}
+.nav::-webkit-scrollbar{display:none}
+.nav-btn{background:none;border:none;color:var(--muted);font-size:12.5px;font-weight:500;padding:7px 11px;border-radius:9px;cursor:pointer;display:flex;align-items:center;gap:6px;white-space:nowrap;transition:all .15s;font-family:inherit;flex-shrink:0}
+.nav-btn .ic{font-size:15px;line-height:1}
 .nav-btn.active{color:var(--teal);background:var(--teal-glow)}
 .nav-btn:hover:not(.active){color:var(--white);background:var(--surface2)}
-.user-chip{margin-left:auto;display:flex;align-items:center;gap:12px}
+.user-chip{margin-left:auto;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .user-info{text-align:right;line-height:1.3}
 .user-info .nm{font-size:13px;font-weight:600}
 .user-info .rl{font-size:10px;color:var(--teal);text-transform:uppercase;letter-spacing:1px;font-weight:600}
@@ -239,12 +243,17 @@ canvas{max-width:100%}
 .loading-full{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;z-index:300}
 
 /* RESPONSIVE */
+@media(max-width:900px){
+  .nav-btn span:not(.ic){display:none} /* esconde texto, só ícone */
+  .nav-btn{padding:8px 10px;font-size:0}
+  .nav-btn .ic{font-size:18px}
+}
 @media(max-width:760px){
   .g4{grid-template-columns:1fr 1fr}.g3{grid-template-columns:1fr}.g2{grid-template-columns:1fr}
   .frow{grid-template-columns:1fr}.pay-grid{grid-template-columns:1fr 1fr}
-  .nav{margin-left:0;order:3;width:100%}.nav-btn{font-size:12px;padding:6px 10px}
-  .topbar{height:auto;padding:12px 16px;flex-wrap:wrap}
-  .user-chip{order:2}.main{padding:18px 14px}
+  .main{padding:18px 14px}
+  .topbar{padding:0 12px;gap:6px}
+  .tb-logo .duke{font-size:18px}
 }
 </style>
 </head>
