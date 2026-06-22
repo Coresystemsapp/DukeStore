@@ -357,6 +357,8 @@ canvas{max-width:100%}
           <div id="cart-area"><div class="empty" style="padding:24px"><p>Nenhum item no carrinho</p></div></div>
           <div class="cart-summary" id="cart-summary" style="display:none">
             <div class="cart-line"><span>Itens</span><span id="cs-itens">0</span></div>
+            <div class="cart-line"><span>Subtotal</span><span>R$ <span id="cs-sub">0,00</span></span></div>
+            <div class="cart-line" id="cs-desc-line" style="display:none;color:var(--success)"><span>Desconto</span><span>− R$ <span id="cs-desc-val">0,00</span></span></div>
             <div class="cart-line total"><span>Total</span><span>R$ <span id="cs-total">0,00</span></span></div>
           </div>
           <div class="fg" style="margin-top:16px"><label>Forma de pagamento</label>
@@ -367,9 +369,22 @@ canvas{max-width:100%}
               <div class="pay-opt" data-pay="pix" onclick="selPay('pix')"><span class="pic">⚡</span>Pix</div>
             </div>
           </div>
+          <div class="fg" style="margin-top:4px"><label>Desconto</label>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="display:flex;border:1px solid var(--border);border-radius:var(--rs);overflow:hidden;flex-shrink:0">
+                <button class="disc-type-btn active" id="disc-pct" onclick="setDiscType('pct')" style="padding:10px 14px;background:var(--teal-glow);border:none;color:var(--teal);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">%</button>
+                <button class="disc-type-btn" id="disc-rs" onclick="setDiscType('rs')" style="padding:10px 14px;background:none;border:none;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;font-family:inherit">R$</button>
+              </div>
+              <input type="number" class="inp" id="pdv-desconto" min="0" placeholder="0" style="flex:1" oninput="renderCart()" onchange="renderCart()">
+              <span id="disc-preview" style="font-size:13px;color:var(--success);white-space:nowrap;min-width:60px;text-align:right"></span>
+            </div>
+          </div>
           <div class="frow">
             <div class="fg"><label>Cliente (fidelização)</label><input type="text" class="inp" id="pdv-cliente" placeholder="Nome do cliente" autocomplete="off" oninput="clienteSugest()"><div class="psl" id="cliente-list"></div></div>
             <div class="fg"><label>Telefone / WhatsApp</label><input type="text" class="inp" id="pdv-fone" placeholder="(00) 00000-0000"></div>
+          </div>
+          <div class="fg"><label>Vendedor responsável</label>
+            <input type="text" class="inp" id="pdv-vendedor" placeholder="Nome do vendedor" autocomplete="off">
           </div>
           <button class="btn btn-pri" style="width:100%;justify-content:center;padding:14px;margin-top:6px" onclick="finalizarVenda()">✓ Finalizar venda</button>
         </div>
@@ -576,7 +591,7 @@ const MARGEM = 0.40; // 40% de margem padrão
 const CATS = ['Proteínas','Creatina','Pré-Treino','Vitaminas','Aminoácidos','Queimadores','Pasta de Amendoim','Barras','Acessórios','Outros'];
 let produtos = [], movs = [], vendas = [], usuarios = [], clientes = [];
 let currentUser = null, currentRole = 'vendedor', currentName = '';
-let movTipo = 'entrada', cartItems = [], selPayMethod = 'dinheiro', relPeriod = 7;
+let movTipo = 'entrada', cartItems = [], selPayMethod = 'dinheiro', relPeriod = 7, discType = 'pct';
 let chDias, chTop, chPay, chEst, quaggaRunning = false;
 let seedDone = false;
 
@@ -776,7 +791,7 @@ window.go = function(p){
   const btn=document.querySelector(`.nav-btn[data-page="${p}"]`); if(btn) btn.classList.add('active');
   stopCam();
   if(p==='dashboard') renderDash();
-  if(p==='pdv'){ cartItems=[]; selPayMethod='dinheiro'; $('pdv-srch').value=''; $('pdv-cliente').value=''; $('pdv-fone').value=''; selPay('dinheiro'); renderCart(); }
+  if(p==='pdv'){ cartItems=[]; selPayMethod='dinheiro'; discType='pct'; $('pdv-srch').value=''; $('pdv-cliente').value=''; $('pdv-fone').value=''; $('pdv-desconto').value=''; $('disc-preview').textContent=''; selPay('dinheiro'); setTimeout(()=>{ const vf=$('pdv-vendedor'); if(vf) vf.value=currentName; },30); renderCart(); }
   if(p==='produtos') { populateMarcaFilter(); renderProd(); }
   if(p==='movimentacoes') renderMovs();
   if(p==='vendas') renderVendas();
@@ -1005,14 +1020,34 @@ window.addCart=function(id){
 };
 window.changeQty=function(id,d){ const i=cartItems.find(x=>x.id===id); if(!i)return; i.qtd+=d; if(i.qtd<=0){ cartItems=cartItems.filter(x=>x.id!==id); } else if(i.qtd>i.max){ i.qtd=i.max; toast('Estoque máximo: '+i.max,'err'); } renderCart(); };
 window.rmCart=function(id){ cartItems=cartItems.filter(i=>i.id!==id); renderCart(); };
+function calcDisc(sub){
+  const raw=parseFloat(($('pdv-desconto')||{value:'0'}).value)||0;
+  if(!raw) return 0;
+  if(discType==='pct') return Math.min(sub, sub*raw/100);
+  return Math.min(sub, raw);
+}
 function renderCart(){
   const el=$('cart-area'), sum=$('cart-summary');
-  const total=cartItems.reduce((a,i)=>a+i.qtd*i.preco,0), itens=cartItems.reduce((a,i)=>a+i.qtd,0);
-  if(!cartItems.length){ el.innerHTML='<div class="empty" style="padding:24px"><p>Nenhum item no carrinho</p></div>'; sum.style.display='none'; return; }
-  sum.style.display='block'; $('cs-itens').textContent=itens; $('cs-total').textContent=total.toFixed(2).replace('.',',');
+  const sub=cartItems.reduce((a,i)=>a+i.qtd*i.preco,0), itens=cartItems.reduce((a,i)=>a+i.qtd,0);
+  if(!cartItems.length){ el.innerHTML='<div class="empty" style="padding:24px"><p>Nenhum item no carrinho</p></div>'; sum.style.display='none'; const dp=$('disc-preview'); if(dp) dp.textContent=''; return; }
+  const disc=calcDisc(sub), total=sub-disc;
+  sum.style.display='block'; $('cs-itens').textContent=itens;
+  const subEl=$('cs-sub'); if(subEl) subEl.textContent=sub.toFixed(2).replace('.',',');
+  const dl=$('cs-desc-line'); if(dl) dl.style.display=disc>0?'flex':'none';
+  const dv=$('cs-desc-val'); if(dv) dv.textContent=disc.toFixed(2).replace('.',',');
+  const dp=$('disc-preview'); if(dp) dp.textContent=disc>0?'− '+fmtR(disc):'';
+  $('cs-total').textContent=total.toFixed(2).replace('.',',');
   el.innerHTML='<table class="cart-tbl"><tbody>'+cartItems.map(i=>`<tr><td><strong style="font-size:13px">${i.nome}</strong><div class="td-m">${fmtR(i.preco)}</div></td><td style="white-space:nowrap"><span class="qty-ctrl"><button class="qty-btn" onclick="changeQty('${i.id}',-1)">−</button><span style="min-width:22px;text-align:center;font-weight:600">${i.qtd}</span><button class="qty-btn" onclick="changeQty('${i.id}',1)">+</button></span></td><td style="color:var(--teal);font-weight:600;white-space:nowrap">${fmtR(i.qtd*i.preco)}</td><td><button class="abtn del" onclick="rmCart('${i.id}')">✕</button></td></tr>`).join('')+'</tbody></table>';
 }
 window.selPay=function(m){ selPayMethod=m; document.querySelectorAll('.pay-opt').forEach(o=>o.classList.toggle('sel',o.dataset.pay===m)); };
+window.setDiscType=function(t){
+  discType=t;
+  const bp=$('disc-pct'), br=$('disc-rs');
+  if(!bp||!br) return;
+  if(t==='pct'){ bp.style.background='var(--teal-glow)'; bp.style.color='var(--teal)'; br.style.background='none'; br.style.color='var(--muted)'; }
+  else { br.style.background='var(--teal-glow)'; br.style.color='var(--teal)'; bp.style.background='none'; bp.style.color='var(--muted)'; }
+  renderCart();
+};
 window.clienteSugest=function(){
   const q=($('pdv-cliente').value||'').toLowerCase(), lst=$('cliente-list');
   if(!q||q.length<2){ lst.className='psl'; return; }
@@ -1025,8 +1060,11 @@ window.pickCliente=function(nome,fone){ $('pdv-cliente').value=nome; $('pdv-fone
 
 window.finalizarVenda=async function(){
   if(!cartItems.length){ toast('Carrinho vazio','err'); return; }
-  const total=cartItems.reduce((a,i)=>a+i.qtd*i.preco,0), qtdTotal=cartItems.reduce((a,i)=>a+i.qtd,0);
+  const sub=cartItems.reduce((a,i)=>a+i.qtd*i.preco,0), qtdTotal=cartItems.reduce((a,i)=>a+i.qtd,0);
+  const disc=calcDisc(sub), total=sub-disc;
   const cliente=$('pdv-cliente').value.trim(), fone=$('pdv-fone').value.trim();
+  const vendedorField=$('pdv-vendedor'); const vendedorNome=(vendedorField?vendedorField.value.trim():'')||currentName;
+  const discInfo=disc>0?{desconto:disc,descontoTipo:discType,descontoValor:parseFloat($('pdv-desconto').value)||0}:{};
   try{
     const batch=writeBatch(db);
     cartItems.forEach(ci=>{
@@ -1034,18 +1072,18 @@ window.finalizarVenda=async function(){
       const nq=p.qtd-ci.qtd;
       batch.update(doc(db,'produtos',ci.id),{qtd:nq});
       const mvRef=doc(collection(db,'movimentacoes'));
-      batch.set(mvRef,{data:serverTimestamp(),pid:ci.id,pnome:ci.nome,tipo:'venda',qtd:ci.qtd,apos:nq+' '+p.un,obs:'Venda PDV',usuario:currentName,valor:ci.qtd*ci.preco});
+      batch.set(mvRef,{data:serverTimestamp(),pid:ci.id,pnome:ci.nome,tipo:'venda',qtd:ci.qtd,apos:nq+' '+p.un,obs:'Venda PDV',usuario:vendedorNome,valor:ci.qtd*ci.preco});
     });
     const vRef=doc(collection(db,'vendas'));
-    batch.set(vRef,{data:serverTimestamp(),itens:cartItems.map(i=>({id:i.id,nome:i.nome,qtd:i.qtd,preco:i.preco})),total,qtdTotal,pagamento:selPayMethod,cliente:cliente||'',fone:fone||'',vendedor:currentName});
+    batch.set(vRef,{data:serverTimestamp(),itens:cartItems.map(i=>({id:i.id,nome:i.nome,qtd:i.qtd,preco:i.preco})),subtotal:sub,...discInfo,total,qtdTotal,pagamento:selPayMethod,cliente:cliente||'',fone:fone||'',vendedor:vendedorNome});
     await batch.commit();
     // atualiza local
-    cartItems.forEach(ci=>{ const p=produtos.find(x=>x.id===ci.id); p.qtd-=ci.qtd; movs.push({id:'tmp'+Math.random(),data:new Date(),pid:ci.id,pnome:ci.nome,tipo:'venda',qtd:ci.qtd,apos:p.qtd+' '+p.un,obs:'Venda PDV',usuario:currentName,valor:ci.qtd*ci.preco}); });
+    cartItems.forEach(ci=>{ const p=produtos.find(x=>x.id===ci.id); p.qtd-=ci.qtd; movs.push({id:'tmp'+Math.random(),data:new Date(),pid:ci.id,pnome:ci.nome,tipo:'venda',qtd:ci.qtd,apos:p.qtd+' '+p.un,obs:'Venda PDV',usuario:vendedorNome,valor:ci.qtd*ci.preco}); });
     vendas.push({id:vRef.id,data:new Date(),itens:cartItems.map(i=>({id:i.id,nome:i.nome,qtd:i.qtd,preco:i.preco})),total,qtdTotal,pagamento:selPayMethod,cliente,fone,vendedor:currentName});
     buildClientes();
-    cartItems=[]; $('pdv-cliente').value=''; $('pdv-fone').value=''; selPay('dinheiro'); renderCart();
+    cartItems=[]; $('pdv-cliente').value=''; $('pdv-fone').value=''; $('pdv-desconto').value=''; discType='pct'; setDiscType('pct'); const vf=$('pdv-vendedor'); if(vf) vf.value=currentName; selPay('dinheiro'); renderCart();
     if(isAdmin()) renderDash();
-    toast('Venda de '+fmtR(total)+' registrada!','ok');
+    toast('Venda de '+fmtR(total)+(disc>0?' (desconto: '+fmtR(disc)+')':'')+' — '+vendedorNome,'ok');
   }catch(e){ toast('Erro ao finalizar: '+e.message,'err'); }
 };
 
@@ -1054,7 +1092,8 @@ function renderVendas(){
   if(!vendas.length){ tb.innerHTML='<tr><td colspan="7"><div class="empty"><div class="e-ic">💰</div><p>Nenhuma venda registrada</p></div></td></tr>'; return; }
   tb.innerHTML=[...vendas].reverse().map(v=>{
     const pc=`pay-${v.pagamento||'dinheiro'}`;
-    return `<tr><td class="td-m">${fmtDate(v.data)}</td><td style="font-size:12px">${v.itens.map(i=>i.nome+' ×'+i.qtd).join(', ')}</td><td class="td-m">${v.qtdTotal}</td><td style="color:var(--teal);font-weight:600">${fmtR(v.total)}</td><td><span class="pay-pill ${pc}">${PAY_LABEL[v.pagamento]||'—'}</span></td><td>${v.cliente||'<span class="td-m">—</span>'}</td><td class="td-m">${v.vendedor||'—'}</td></tr>`;
+    const descLabel=v.desconto>0?`<div class="td-m" style="color:var(--success)">−${fmtR(v.desconto)}</div>`:'';
+    return `<tr><td class="td-m">${fmtDate(v.data)}</td><td style="font-size:12px">${v.itens.map(i=>i.nome+' ×'+i.qtd).join(', ')}</td><td class="td-m">${v.qtdTotal}</td><td style="color:var(--teal);font-weight:600">${fmtR(v.total)}${descLabel}</td><td><span class="pay-pill ${pc}">${PAY_LABEL[v.pagamento]||'—'}</span></td><td>${v.cliente||'<span class="td-m">—</span>'}</td><td><strong style="font-size:13px">${v.vendedor||currentName}</strong></td></tr>`;
   }).join('');
 }
 
@@ -1117,7 +1156,7 @@ function renderRelatorio(){
   const desde=Date.now()-relPeriod*86400000;
   const vList=vendas.filter(v=>tms(v.data)>=desde);
   const total=vList.reduce((a,v)=>a+v.total,0), qtd=vList.length, itens=vList.reduce((a,v)=>a+v.qtdTotal,0);
-  let lucro=0; vList.forEach(v=>v.itens.forEach(i=>{ const p=produtos.find(x=>x.id===i.id); const custo=p?p.custo||0:0; lucro+=(i.preco-custo)*i.qtd; }));
+  let lucro=0; vList.forEach(v=>{ const descPorItem=v.desconto&&v.subtotal?v.desconto/v.subtotal:0; v.itens.forEach(i=>{ const p=produtos.find(x=>x.id===i.id); const custo=p?p.custo||0:0; const precoEfetivo=i.preco*(1-descPorItem); lucro+=(precoEfetivo-custo)*i.qtd; }); });
   $('r-total').textContent=fmtR(total); $('r-qtd').textContent=qtd+' vendas'; $('r-ticket').textContent=fmtR(qtd?total/qtd:0); $('r-itens').textContent=itens; $('r-lucro').textContent=fmtR(lucro);
   // dias
   const diasMap={}; for(let i=relPeriod-1;i>=0;i--){ diasMap[new Date(Date.now()-i*86400000).toLocaleDateString('pt-BR')]=0; }
